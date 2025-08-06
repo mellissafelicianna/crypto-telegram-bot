@@ -1,4 +1,4 @@
-// ✅ Volledig werkende en definitieve versie met vaste Telegram-gegevens
+// ✅ Volledige, foutloze versie
 const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios");
@@ -6,25 +6,25 @@ const axios = require("axios");
 const app = express();
 app.use(bodyParser.json());
 
-// ⛔️ LET OP: In productie liever via .env!
+// ⛔️ Tijdelijk hardcoded — in productie liever via process.env
 const TELEGRAM_TOKEN = "8498909101:AAG0kAGj-Jt22x7jLXcl7AuZpGJMFzOIAfk";
 const CHAT_ID = "8425195586";
 
-// ✅ Bericht verzenden naar Telegram met veilige opmaak
+// ✅ Bericht verzenden naar Telegram
 async function sendTelegramMessage(message) {
   const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
   try {
     await axios.post(url, {
       chat_id: CHAT_ID,
       text: message,
-      parse_mode: "MarkdownV2"
+      parse_mode: "Markdown"
     });
   } catch (err) {
     console.error("Telegram verzendfout:", err.response?.data || err.message);
   }
 }
 
-// ✅ Webhook voor TradingView alerts
+// ✅ Webhook endpoint voor TradingView alerts
 app.post("/webhook", async (req, res) => {
   try {
     const data = req.body;
@@ -39,15 +39,14 @@ app.post("/webhook", async (req, res) => {
     const targetProfit = 400;
     const stopLoss = price * 0.99;
     const takeProfit = price * 1.03;
-    const riskPerTrade = maxLoss;
-    const positionSize = (riskPerTrade / Math.abs(price - stopLoss)).toFixed(2);
+    const positionSize = (maxLoss / Math.abs(price - stopLoss)).toFixed(2);
 
     let message = "";
 
     if (signal === "BUY") {
-      message = `🟢 *BUY ALERT – ${symbol}*\n━━━━━━━━━━━━━━━\n📊 Prijs: \$${price.toFixed(2)}\n🎯 Take\-Profit: \$${takeProfit.toFixed(2)}\n🛡️ Stop\-Loss: \$${stopLoss.toFixed(2)}\n📦 Inzet: €${positionSize}\n💰 Verwachte winst: €${targetProfit}\n✅ Filters: Bollinger ${filters.bollinger || "nvt"}, Volatiliteit ${filters.atr || "nvt"}\n⏱️ Tijd: ${time}`;
+      message = `🟢 *BUY ALERT – ${symbol}*\n━━━━━━━━━━━━━━━\n📊 Prijs: $${price.toFixed(2)}\n🎯 Take-Profit: $${takeProfit.toFixed(2)}\n🛡️ Stop-Loss: $${stopLoss.toFixed(2)}\n📦 Inzet: €${positionSize}\n💰 Verwachte winst: €${targetProfit}\n✅ Filters: Bollinger ${filters.bollinger || "nvt"}, Volatiliteit ${filters.atr || "nvt"}\n⏱️ Tijd: ${time}`;
     } else if (signal === "SELL") {
-      message = `🔴 *SELL ALERT – ${symbol}*\n━━━━━━━━━━━━━━━\n📊 Prijs: \$${price.toFixed(2)}\n💰 Gerealiseerde winst: €${targetProfit}\n🔒 Risico: max €${maxLoss}\n✅ Filters: Bollinger ${filters.bollinger || "nvt"}, Volatiliteit ${filters.atr || "nvt"}\n⏱️ Tijd: ${time}`;
+      message = `🔴 *SELL ALERT – ${symbol}*\n━━━━━━━━━━━━━━━\n📊 Prijs: $${price.toFixed(2)}\n💰 Gerealiseerde winst: €${targetProfit}\n🔒 Risico: max €${maxLoss}\n✅ Filters: Bollinger ${filters.bollinger || "nvt"}, Volatiliteit ${filters.atr || "nvt"}\n⏱️ Tijd: ${time}`;
     } else {
       message = `⚠️ Onbekend signaal ontvangen:\n${JSON.stringify(data, null, 2)}`;
     }
@@ -60,16 +59,6 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
+// ✅ Correcte poort-afhandeling (nooit hardcoded!)
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server draait op poort ${PORT}`));
-
-  console.log(`🚀 Server draait op poort ${PORT}`);
-}).on("error", (err) => {
-  if (err.code === "EADDRINUSE") {
-    console.error(`❌ Poort ${PORT} is al in gebruik. Probeer een andere poort of stop bestaande processen.`);
-    process.exit(1);
-  } else {
-    throw err;
-  }
-});
-
