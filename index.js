@@ -14,12 +14,12 @@ const CHAT_ID = "8425195586";
 async function sendTelegramMessage(message) {
   const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
   try {
-    await axios.post(url, {
-      chat_id: CHAT_ID,
-      text: message,
-      parse_mode: "MarkdownV2", // Zorgt voor veilige opmaak
-      disable_web_page_preview: true,
-    });
+ await axios.post(url, {
+  chat_id: CHAT_ID,
+  text: message,
+  parse_mode: "Markdown",
+});
+
   } catch (err) {
     console.error("Telegram verzendfout:", err.response?.data || err.message);
   }
