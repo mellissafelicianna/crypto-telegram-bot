@@ -16,8 +16,10 @@ async function sendTelegramMessage(message) {
   try {
 await axios.post(url, {
   chat_id: CHAT_ID,
-  text: message
+  text: message,
+  parse_mode: "HTML",
 });
+
 
 
   } catch (err) {
