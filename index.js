@@ -7,7 +7,7 @@ const app = express();
 app.use(bodyParser.json());
 
 // ⛔️ LET OP: In productie liever via .env!
-const TELEGRAM_TOKEN = "7441716590:AAG5tCx9JnRmiPVv-7Ekn-u6-PNUYS2p0Mw";
+const TELEGRAM_TOKEN = "7626536935:AAE9EHiowAI4YyyX0mwFc1I0DpdJnewztwlQ";
 const CHAT_ID = "8425195586";
 
 // ✅ Bericht verzenden naar Telegram
