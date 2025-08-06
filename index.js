@@ -1,4 +1,4 @@
-// ✅ Volledig werkende versie met vaste Telegram-gegevens (tijdelijk)
+// ✅ Volledig werkende en definitieve versie met vaste Telegram-gegevens
 const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios");
@@ -10,23 +10,15 @@ app.use(bodyParser.json());
 const TELEGRAM_TOKEN = "8498909101:AAG0kAGj-Jt22x7jLXcl7AuZpGJMFzOIAfk";
 const CHAT_ID = "8425195586";
 
-// ✅ Bericht verzenden naar Telegram
+// ✅ Bericht verzenden naar Telegram met veilige opmaak
 async function sendTelegramMessage(message) {
   const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
   try {
-await axios.post(url, {
-  chat_id: CHAT_ID,
-  text: message // ← parse_mode verwijderd
-});
-
-  } catch (err) {
-    console.error("Telegram verzendfout:", err.response?.data || err.message);
-  }
-}
-
-
-
-
+    await axios.post(url, {
+      chat_id: CHAT_ID,
+      text: message,
+      parse_mode: "MarkdownV2"
+    });
   } catch (err) {
     console.error("Telegram verzendfout:", err.response?.data || err.message);
   }
@@ -53,9 +45,9 @@ app.post("/webhook", async (req, res) => {
     let message = "";
 
     if (signal === "BUY") {
-      message = `🟢 *BUY ALERT – ${symbol}*\n━━━━━━━━━━━━━━━\n📊 Prijs: $${price.toFixed(2)}\n🎯 Take-Profit: $${takeProfit.toFixed(2)}\n🛡️ Stop-Loss: $${stopLoss.toFixed(2)}\n📦 Inzet: €${positionSize}\n💰 Verwachte winst: €${targetProfit}\n✅ Filters: Bollinger ${filters.bollinger || "nvt"}, Volatiliteit ${filters.atr || "nvt"}\n⏱️ Tijd: ${time}`;
+      message = `🟢 *BUY ALERT – ${symbol}*\n━━━━━━━━━━━━━━━\n📊 Prijs: \$${price.toFixed(2)}\n🎯 Take\-Profit: \$${takeProfit.toFixed(2)}\n🛡️ Stop\-Loss: \$${stopLoss.toFixed(2)}\n📦 Inzet: €${positionSize}\n💰 Verwachte winst: €${targetProfit}\n✅ Filters: Bollinger ${filters.bollinger || "nvt"}, Volatiliteit ${filters.atr || "nvt"}\n⏱️ Tijd: ${time}`;
     } else if (signal === "SELL") {
-      message = `🔴 *SELL ALERT – ${symbol}*\n━━━━━━━━━━━━━━━\n📊 Prijs: $${price.toFixed(2)}\n💰 Gerealiseerde winst: €${targetProfit}\n🔒 Risico: max €${maxLoss}\n✅ Filters: Bollinger ${filters.bollinger || "nvt"}, Volatiliteit ${filters.atr || "nvt"}\n⏱️ Tijd: ${time}`;
+      message = `🔴 *SELL ALERT – ${symbol}*\n━━━━━━━━━━━━━━━\n📊 Prijs: \$${price.toFixed(2)}\n💰 Gerealiseerde winst: €${targetProfit}\n🔒 Risico: max €${maxLoss}\n✅ Filters: Bollinger ${filters.bollinger || "nvt"}, Volatiliteit ${filters.atr || "nvt"}\n⏱️ Tijd: ${time}`;
     } else {
       message = `⚠️ Onbekend signaal ontvangen:\n${JSON.stringify(data, null, 2)}`;
     }
@@ -69,4 +61,6 @@ app.post("/webhook", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Server draait op poort ${PORT}`));
+
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
