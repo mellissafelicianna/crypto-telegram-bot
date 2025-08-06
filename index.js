@@ -4,16 +4,17 @@ dotenv.config();
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
-const MAX_LOSS = 15.50;
-const TP_PERCENT = 0.03;
-const SL_PERCENT = 0.01;
+
+const MAX_LOSS = 15.50; // max verlies
+const TP_PERCENT = 0.03; // 3% take profit
+const SL_PERCENT = 0.01; // 1% stop loss
 
 const COINS = [
   { id: "bitcoin", symbol: "BTCUSDT" },
   { id: "ethereum", symbol: "ETHUSDT" },
   { id: "solana", symbol: "SOLUSDT" },
   { id: "ripple", symbol: "XRPUSDT" },
-  { id: "binancecoin", symbol: "BNBUSDT" }
+  { id: "binancecoin", symbol: "BNBUSDT" },
 ];
 
 async function checkSignals() {
@@ -34,51 +35,54 @@ async function checkSignals() {
       const oldPrice = closes[closes.length - 60];
       const priceChange = ((latestPrice - oldPrice) / oldPrice) * 100;
 
-      let signal = null;
-      if (priceChange < -2) signal = "BUY";
-      if (priceChange > 2) signal = "SELL";
+      let signal = "";
+      if (priceChange <= -2) signal = "BUY";
+      if (priceChange >= 2) signal = "SELL";
 
       if (signal) {
-        const stopLoss =
+        const stoploss =
           signal === "BUY"
-            ? (latestPrice * (1 - SL_PERCENT)).toFixed(2)
-            : (latestPrice * (1 + SL_PERCENT)).toFixed(2);
+            ? latestPrice * (1 - SL_PERCENT)
+            : latestPrice * (1 + SL_PERCENT);
 
-        const takeProfit =
+        const takeprofit =
           signal === "BUY"
-            ? (latestPrice * (1 + TP_PERCENT)).toFixed(2)
-            : (latestPrice * (1 - TP_PERCENT)).toFixed(2);
-
-        const positionSize = (
-          MAX_LOSS / Math.abs(latestPrice - stopLoss)
-        ).toFixed(2);
+            ? latestPrice * (1 + TP_PERCENT)
+            : latestPrice * (1 - TP_PERCENT);
 
         alerts += `
-🚨 *Crypto Alert – ${coin.symbol}*
-━━━━━━━━━━━━━━━
-📊 Signal: ${signal}
-📉 1h Change: ${priceChange.toFixed(2)}%
-📈 Entry: ${latestPrice.toFixed(2)}
-🛡️ Stop-Loss: ${stopLoss}
-🎯 Take-Profit: ${takeProfit}
-📦 Position: ${positionSize} units
-⚠️ Max loss: €${MAX_LOSS}\n
-        `;
+🚨 *ALERT* 🚨
+Symbol: ${coin.symbol}
+Signal: ${signal}
+Entry: ${latestPrice.toFixed(2)}
+Stop-Loss: ${stoploss.toFixed(2)}
+Take-Profit: ${takeprofit.toFixed(2)}
+==============================\n`;
       }
     } catch (error) {
-      alerts += `❌ Error for ${coin.symbol}: ${error.message}\n`;
+      console.error(`Error for ${coin.symbol}:`, error.message);
     }
   }
 
-  const message =
-    alerts || "✅ No strong trading signals detected right now.";
-
-  await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-    chat_id: CHAT_ID,
-    text: message,
-    parse_mode: "Markdown",
-  });
+  if (alerts) {
+    await sendTelegramMessage(alerts);
+  }
 }
 
+async function sendTelegramMessage(message) {
+  try {
+    await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+      chat_id: CHAT_ID,
+      text: message,
+      parse_mode: "Markdown",
+    });
+    console.log("✅ Alert succesvol verzonden naar Telegram.");
+  } catch (error) {
+    console.error("❌ Fout bij verzenden naar Telegram:", error.message);
+  }
+}
+
+// Check elke minuut
+setInterval(checkSignals, 60000);
 checkSignals();
-setInterval(checkSignals, 5 * 60 * 1000); // Elke 5 minuten
+
