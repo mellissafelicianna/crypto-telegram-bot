@@ -1,7 +1,7 @@
 {
-  "name": "crypto-telegram-bot",
+  "name": "tradingview-telegram-bot",
   "version": "1.0.0",
-  "description": "Pro TradingView Webhook to Telegram Bot",
+  "description": "Webhook bot voor TradingView alerts naar Telegram",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
