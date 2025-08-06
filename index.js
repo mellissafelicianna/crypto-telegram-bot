@@ -1,89 +1,74 @@
+import express from "express";
 import axios from "axios";
 import dotenv from "dotenv";
+
 dotenv.config();
 
-const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
-const CHAT_ID = process.env.CHAT_ID;
+const app = express();
+app.use(express.json());
 
-const TP_PERCENT = 0.03;  // 3% winstdoel
-const SL_PERCENT = 0.01;  // 1% stoploss
+const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-const COINS = [
-  { id: "bitcoin", symbol: "BTCUSDT" },
-  { id: "ethereum", symbol: "ETHUSDT" },
-  { id: "solana", symbol: "SOLUSDT" },
-  { id: "ripple", symbol: "XRPUSDT" },
-  { id: "binancecoin", symbol: "BNBUSDT" },
-];
+let dailyProfit = 0; // Houd winst per dag bij
+const TRADE_AMOUNT = 62.50;
+const MAX_LOSS = 15.75;
+const DAILY_TARGET = 400;
+const MAX_TRADES = 5;
+let tradeCount = 0;
 
-async function checkSignals() {
-  console.log("🔎 Checking signals...");
-
-  let alerts = "";
-
-  for (const coin of COINS) {
-    try {
-      const response = await axios.get(
-        `https://api.coingecko.com/api/v3/coins/${coin.id}/market_chart`,
-        {
-          params: { vs_currency: "usd", days: 1, interval: "minute" },
-          headers: { "User-Agent": "Mozilla/5.0 (Crypto Bot)" },
-        }
-      );
-
-      const closes = response.data.prices.map((p) => p[1]);
-      if (closes.length < 60) continue;
-
-      const latestPrice = closes[closes.length - 1];
-      const oldPrice = closes[closes.length - 60];
-      const priceChange = ((latestPrice - oldPrice) / oldPrice) * 100;
-
-      let signal = "";
-      if (priceChange <= -2) signal = "BUY";
-      if (priceChange >= 2) signal = "SELL";
-
-      if (signal) {
-        const stoploss =
-          signal === "BUY"
-            ? latestPrice * (1 - SL_PERCENT)
-            : latestPrice * (1 + SL_PERCENT);
-
-        const takeprofit =
-          signal === "BUY"
-            ? latestPrice * (1 + TP_PERCENT)
-            : latestPrice * (1 - TP_PERCENT);
-
-        alerts += `
-🚨 *TRADE ALERT* 🚨
-Coin: ${coin.symbol}
-Signal: ${signal}
-Entry: $${latestPrice.toFixed(2)}
-Stop-Loss: $${stoploss.toFixed(2)}
-Take-Profit: $${takeprofit.toFixed(2)}
--------------------------------\n`;
-      }
-    } catch (error) {
-      console.error(`⚠️ Error for ${coin.symbol}:`, error.message);
-    }
-  }
-
-  if (alerts) {
-    await sendTelegramMessage(alerts);
-  }
-}
-
+// ✅ Functie: Telegram melding sturen
 async function sendTelegramMessage(message) {
   try {
     await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
       chat_id: CHAT_ID,
       text: message,
-      parse_mode: "Markdown",
+      parse_mode: "Markdown"
     });
-    console.log("✅ Alert sent to Telegram");
   } catch (error) {
-    console.error("❌ Telegram error:", error.message);
+    console.error("Telegram Fout:", error.message);
   }
 }
 
-setInterval(checkSignals, 60000);
-checkSignals();
+// ✅ Webhook endpoint voor TradingView alerts
+app.post("/webhook", async (req, res) => {
+  const alert = req.body;
+
+  if (!alert || !alert.signal) {
+    return res.status(400).send("Ongeldig alert");
+  }
+
+  // Basis trade logica
+  if (tradeCount >= MAX_TRADES) {
+    await sendTelegramMessage("🚫 Maximaal aantal trades bereikt vandaag.");
+    return res.status(200).send("Max trades");
+  }
+
+  let actionMessage = "";
+  if (alert.signal === "BUY") {
+    actionMessage = `🟢 Koop-signaal ontvangen!\nInzet: €${TRADE_AMOUNT}`;
+  } else if (alert.signal === "SELL") {
+    actionMessage = `🔴 Verkoop-signaal ontvangen!\nInzet: €${TRADE_AMOUNT}`;
+  }
+
+  // Winst/verlies simulatie
+  const profitLoss = alert.pnl || 0; // TradingView kan 'pnl' sturen
+  dailyProfit += profitLoss;
+
+  if (profitLoss <= -MAX_LOSS) {
+    actionMessage += `\n⚠️ Max verlies bereikt (-€${Math.abs(profitLoss)})`;
+  } else if (dailyProfit >= DAILY_TARGET) {
+    actionMessage += `\n🎉 Dagelijks winstdoel behaald: €${dailyProfit}`;
+  }
+
+  tradeCount++;
+
+  await sendTelegramMessage(actionMessage);
+  return res.status(200).send("OK");
+});
+
+// ✅ Server start
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`🚀 Bot draait op poort ${PORT}`);
+});
