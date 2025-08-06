@@ -10,14 +10,12 @@ app.use(express.json());
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-let dailyProfit = 0; // Houd winst per dag bij
-const TRADE_AMOUNT = 62.50;
+const COINS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "BNBUSDT"];
 const MAX_LOSS = 15.75;
-const DAILY_TARGET = 400;
-const MAX_TRADES = 5;
-let tradeCount = 0;
+const TARGET_PROFIT = 400;
+const ENTRY_AMOUNT = 62.50;
 
-// ✅ Functie: Telegram melding sturen
+// ✅ Functie om Telegram-bericht te sturen
 async function sendTelegramMessage(message) {
   try {
     await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
@@ -30,45 +28,88 @@ async function sendTelegramMessage(message) {
   }
 }
 
-// ✅ Webhook endpoint voor TradingView alerts
+// ✅ AI-scanner: berekent RSI & beslist buy/sell
+async function scanMarket() {
+  for (const symbol of COINS) {
+    try {
+      const response = await axios.get(`https://api.bybit.com/v5/market/kline`, {
+        params: { category: "spot", symbol, interval: "15", limit: 100 }
+      });
+
+      const closes = response.data.result.list.map(c => parseFloat(c[4]));
+      const latestPrice = closes[closes.length - 1];
+
+      // RSI berekening
+      const gains = [], losses = [];
+      for (let i = 1; i < closes.length; i++) {
+        const change = closes[i] - closes[i - 1];
+        if (change > 0) gains.push(change);
+        else losses.push(Math.abs(change));
+      }
+      const avgGain = gains.reduce((a, b) => a + b, 0) / (gains.length || 1);
+      const avgLoss = losses.reduce((a, b) => a + b, 0) / (losses.length || 1);
+      const rs = avgGain / avgLoss;
+      const rsi = 100 - (100 / (1 + rs));
+
+      let signal = null;
+      if (rsi < 30) signal = "BUY";
+      if (rsi > 70) signal = "SELL";
+
+      if (signal) {
+        // Bereken Take-Profit en Stop-Loss
+        const stopLoss = signal === "BUY"
+          ? latestPrice * 0.99
+          : latestPrice * 1.01;
+        const takeProfit = signal === "BUY"
+          ? latestPrice * 1.03
+          : latestPrice * 0.97;
+
+        // Bereken inzet om €400 winst te halen
+        const priceDiff = Math.abs(takeProfit - latestPrice);
+        const amountNeeded = (TARGET_PROFIT / priceDiff).toFixed(2);
+
+        const message = `
+🚀 *${signal} ALERT – ${symbol}*
+━━━━━━━━━━━━━━━
+📈 Entry prijs: ${latestPrice.toFixed(2)}
+🎯 Take-Profit: ${takeProfit.toFixed(2)}
+🛡️ Stop-Loss: ${stopLoss.toFixed(2)}
+💸 Inzet: €${amountNeeded}
+⚠️ Max verlies: €${MAX_LOSS}
+📊 RSI: ${rsi.toFixed(2)}  
+`;
+
+        await sendTelegramMessage(message);
+      }
+
+    } catch (err) {
+      console.error(`Fout bij ${symbol}:`, err.message);
+    }
+  }
+}
+
+// ✅ Webhook voor TradingView alerts
 app.post("/webhook", async (req, res) => {
   const alert = req.body;
+  if (!alert || !alert.signal) return res.status(400).send("Ongeldig alert");
 
-  if (!alert || !alert.signal) {
-    return res.status(400).send("Ongeldig alert");
-  }
+  const message = `
+📢 *TradingView Alert – ${alert.symbol}*
+━━━━━━━━━━━━━━━
+Signal: ${alert.signal}
+Prijs: ${alert.price}
+Inzet: €${alert.amount}
+Max verlies: €${alert.maxLoss}
+Target winst: €${alert.targetProfit}
+`;
 
-  // Basis trade logica
-  if (tradeCount >= MAX_TRADES) {
-    await sendTelegramMessage("🚫 Maximaal aantal trades bereikt vandaag.");
-    return res.status(200).send("Max trades");
-  }
-
-  let actionMessage = "";
-  if (alert.signal === "BUY") {
-    actionMessage = `🟢 Koop-signaal ontvangen!\nInzet: €${TRADE_AMOUNT}`;
-  } else if (alert.signal === "SELL") {
-    actionMessage = `🔴 Verkoop-signaal ontvangen!\nInzet: €${TRADE_AMOUNT}`;
-  }
-
-  // Winst/verlies simulatie
-  const profitLoss = alert.pnl || 0; // TradingView kan 'pnl' sturen
-  dailyProfit += profitLoss;
-
-  if (profitLoss <= -MAX_LOSS) {
-    actionMessage += `\n⚠️ Max verlies bereikt (-€${Math.abs(profitLoss)})`;
-  } else if (dailyProfit >= DAILY_TARGET) {
-    actionMessage += `\n🎉 Dagelijks winstdoel behaald: €${dailyProfit}`;
-  }
-
-  tradeCount++;
-
-  await sendTelegramMessage(actionMessage);
+  await sendTelegramMessage(message);
   return res.status(200).send("OK");
 });
 
-// ✅ Server start
+// ✅ Start server
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log(`🚀 Bot draait op poort ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Bot draait 24/7 op poort ${PORT}`));
+
+// ✅ Interval scanner elke 5 min
+setInterval(scanMarket, 5 * 60 * 1000);
