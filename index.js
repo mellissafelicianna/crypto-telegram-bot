@@ -1,5 +1,3 @@
-// ✅ index.js – Crypto Telegram Bot (Pro Edition)
-
 const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios");
@@ -10,26 +8,15 @@ app.use(bodyParser.json());
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 
-// ✅ Fallback check
-if (!TELEGRAM_TOKEN || !CHAT_ID) {
-  console.error("❌ ERROR: Missing TELEGRAM_TOKEN or CHAT_ID in environment variables.");
-  process.exit(1);
+async function sendTelegramMessage(message) {
+  const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
+  await axios.post(url, {
+    chat_id: CHAT_ID,
+    text: message,
+    parse_mode: "Markdown",
+  });
 }
 
-const sendTelegramMessage = async (message) => {
-  try {
-    const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
-    await axios.post(url, {
-      chat_id: CHAT_ID,
-      text: message,
-      parse_mode: "Markdown",
-    });
-  } catch (err) {
-    console.error("❌ Failed to send Telegram message:", err.message);
-  }
-};
-
-// ✅ Webhook endpoint voor TradingView alerts
 app.post("/webhook", async (req, res) => {
   try {
     const data = req.body;
@@ -37,42 +24,46 @@ app.post("/webhook", async (req, res) => {
     const symbol = data.symbol || "?";
     const price = parseFloat(data.price) || 0;
     const signal = (data.signal || "UNKNOWN").toUpperCase();
-    const positionSize = data.positionSize || "?";
-    const stopLoss = data.stopLoss || "?";
-    const takeProfit = data.takeProfit || "?";
-    const targetProfit = 400;
+    const filters = data.filters || {};
     const maxLoss = 15.75;
+    const targetProfit = 400;
+    const stopLoss = price * 0.99; // 1% stop-loss (voorbeeld)
+    const takeProfit = price * 1.03; // 3% winsttarget
+    const riskPerTrade = maxLoss;
+    const positionSize = (riskPerTrade / Math.abs(price - stopLoss)).toFixed(2);
 
-    let message;
+    let message = "";
+
     if (signal === "BUY") {
-      message = `🟢 *BUY SIGNAL*\n━━━━━━━━━━━━━━━
-📊 *Coin:* ${symbol}
-💵 *Instapprijs:* $${price}
-📦 *Positiegrootte:* ${positionSize} units
-🛡️ *Stop-Loss:* $${stopLoss}
-🎯 *Take-Profit:* $${takeProfit}
-💰 *Verwachte winst:* €${targetProfit}
-⚠️ *Max verlies:* €${maxLoss}`;
+      message = `🟢 *BUY ALERT – ${symbol}*\n━━━━━━━━━━━━━━━\n📊 Prijs: $${price.toFixed(
+        2
+      )}\n🎯 Take-Profit: $${takeProfit.toFixed(
+        2
+      )}\n🛡️ Stop-Loss: $${stopLoss.toFixed(
+        2
+      )}\n📦 Inzet: €${positionSize}\n💰 Verwachte winst: €${targetProfit}\n✅ Filters: Bollinger ${
+        filters.bollinger || "nvt"
+      }, Volatiliteit ${filters.atr || "nvt"}\n⏱️ Tijd: ${
+        data.time || "onbekend"
+      }`;
     } else if (signal === "SELL") {
-      message = `🔴 *SELL SIGNAL*\n━━━━━━━━━━━━━━━
-📊 *Coin:* ${symbol}
-💵 *Verkoopprijs:* $${price}
-✅ *Winst veiligstellen / verlies beperken*`;
+      message = `🔴 *SELL ALERT – ${symbol}*\n━━━━━━━━━━━━━━━\n📊 Prijs: $${price.toFixed(
+        2
+      )}\n💰 Gerealiseerde winst: €${targetProfit}\n🔒 Risico: max €${maxLoss}\n✅ Filters: Bollinger ${
+        filters.bollinger || "nvt"
+      }, Volatiliteit ${filters.atr || "nvt"}\n⏱️ Tijd: ${
+        data.time || "onbekend"
+      }`;
     } else {
-      message = `⚠️ *Onbekend signaal ontvangen:*\n${JSON.stringify(data)}`;
+      message = `⚠️ Onbekend signaal ontvangen:\n${JSON.stringify(data)}`;
     }
 
     await sendTelegramMessage(message);
-    res.status(200).send("✅ Signal processed successfully");
+    res.status(200).send("✅ Signal sent to Telegram");
   } catch (error) {
-    console.error("❌ Webhook error:", error.message);
-    res.status(500).send("Error processing webhook");
+    console.error("Webhook error:", error.message);
+    res.status(500).send("❌ Error processing webhook");
   }
-});
-
-// ✅ Healthcheck endpoint
-app.get("/", (req, res) => {
-  res.send("✅ Crypto Telegram Bot is running.");
 });
 
 const PORT = process.env.PORT || 3000;
