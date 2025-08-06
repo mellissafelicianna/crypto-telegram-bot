@@ -17,10 +17,11 @@ async function sendTelegramMessage(message) {
     await axios.post(url, {
       chat_id: CHAT_ID,
       text: message,
-      parse_mode: "Markdown",
+      parse_mode: "MarkdownV2", // Zorgt voor veilige opmaak
+      disable_web_page_preview: true,
     });
   } catch (err) {
-    console.error("Telegram verzendfout:", err.message);
+    console.error("Telegram verzendfout:", err.response?.data || err.message);
   }
 }
 
