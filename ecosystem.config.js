@@ -1,16 +1,12 @@
 module.exports = {
   apps: [
     {
-      name: "crypto-telegram-bot",
+      name: "tv-telegram-bot",
       script: "index.js",
-      instances: 1,
-      autorestart: true,
-      watch: false,
-      max_memory_restart: "200M",
       env: {
         NODE_ENV: "production",
-        TELEGRAM_TOKEN: "YOUR_TELEGRAM_TOKEN",
-        CHAT_ID: "YOUR_CHAT_ID"
+        TELEGRAM_TOKEN: "8498909101:AAG0kAGj-Jt22x7jLXcl7AuZpGJMFzOIAfk",
+        CHAT_ID: "8425195586"
       }
     }
   ]
