@@ -5,9 +5,8 @@ dotenv.config();
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 
-const MAX_LOSS = 15.50; // max verlies
-const TP_PERCENT = 0.03; // 3% take profit
-const SL_PERCENT = 0.01; // 1% stop loss
+const TP_PERCENT = 0.03;  // 3% winstdoel
+const SL_PERCENT = 0.01;  // 1% stoploss
 
 const COINS = [
   { id: "bitcoin", symbol: "BTCUSDT" },
@@ -18,6 +17,8 @@ const COINS = [
 ];
 
 async function checkSignals() {
+  console.log("🔎 Checking signals...");
+
   let alerts = "";
 
   for (const coin of COINS) {
@@ -31,6 +32,8 @@ async function checkSignals() {
       );
 
       const closes = response.data.prices.map((p) => p[1]);
+      if (closes.length < 60) continue;
+
       const latestPrice = closes[closes.length - 1];
       const oldPrice = closes[closes.length - 60];
       const priceChange = ((latestPrice - oldPrice) / oldPrice) * 100;
@@ -51,16 +54,16 @@ async function checkSignals() {
             : latestPrice * (1 - TP_PERCENT);
 
         alerts += `
-🚨 *ALERT* 🚨
-Symbol: ${coin.symbol}
+🚨 *TRADE ALERT* 🚨
+Coin: ${coin.symbol}
 Signal: ${signal}
-Entry: ${latestPrice.toFixed(2)}
-Stop-Loss: ${stoploss.toFixed(2)}
-Take-Profit: ${takeprofit.toFixed(2)}
-==============================\n`;
+Entry: $${latestPrice.toFixed(2)}
+Stop-Loss: $${stoploss.toFixed(2)}
+Take-Profit: $${takeprofit.toFixed(2)}
+-------------------------------\n`;
       }
     } catch (error) {
-      console.error(`Error for ${coin.symbol}:`, error.message);
+      console.error(`⚠️ Error for ${coin.symbol}:`, error.message);
     }
   }
 
@@ -76,13 +79,11 @@ async function sendTelegramMessage(message) {
       text: message,
       parse_mode: "Markdown",
     });
-    console.log("✅ Alert succesvol verzonden naar Telegram.");
+    console.log("✅ Alert sent to Telegram");
   } catch (error) {
-    console.error("❌ Fout bij verzenden naar Telegram:", error.message);
+    console.error("❌ Telegram error:", error.message);
   }
 }
 
-// Check elke minuut
 setInterval(checkSignals, 60000);
 checkSignals();
-
