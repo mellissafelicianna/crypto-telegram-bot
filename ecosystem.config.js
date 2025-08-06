@@ -3,13 +3,14 @@ module.exports = {
     {
       name: "crypto-telegram-bot",
       script: "index.js",
-      watch: true,
+      instances: 1,
       autorestart: true,
-      max_restarts: 10,
-      restart_delay: 5000,
+      watch: false,
+      max_memory_restart: "200M",
       env: {
         NODE_ENV: "production",
-        PORT: 3000
+        TELEGRAM_TOKEN: "YOUR_TELEGRAM_TOKEN",
+        CHAT_ID: "YOUR_CHAT_ID"
       }
     }
   ]
